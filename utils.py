@@ -26,7 +26,7 @@ def generate_flight_dates(dep_date_min_str, dep_date_max_str, duration_min, dura
 
 def save_dataframe_to_csv(df, filename_prefix, output_dir):
     now = datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M%S")  # Format: YYYYMMDD_HHMMSS
+    timestamp = now.strftime("%Y%-m-%d-%H-%M")
     filename = f"{filename_prefix}_{timestamp}.csv"
 
     # Create the output directory if it doesn't exist
