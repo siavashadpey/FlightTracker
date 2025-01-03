@@ -1,0 +1,9 @@
+selenium
+beautifulsoup4
+requests
+python-dateutil
+schedule
+plyer  # For desktop notifications (optional)
+pandas
+#Add playwright if you prefer it over selenium
+#playwright
