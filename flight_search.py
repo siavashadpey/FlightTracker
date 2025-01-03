@@ -5,9 +5,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.chrome.options import Options
 import time
 import logging
 import re 
+from datetime import datetime 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,20 +17,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 wait_time = 10
 
 def get_driver():
-    return webdriver.Chrome()
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")  # Use the new headless mode
+    # or chrome_options.add_argument("--headless") for older versions
+    return webdriver.Chrome(options=chrome_options)
 
 def set_travel_date(driver, flight_type, date):
+    #date_fmt = datetime.strptime(date, "%Y-%m-%d").date().strftime("%a, %b %d")
     try:
         # Find the departure date element and click it
         date_element = WebDriverWait(driver, wait_time).until(
         EC.element_to_be_clickable((By.XPATH, f"//input[@aria-label='{flight_type}']"))
         )
-        date_element.clear()
-
+        #date_element.clear()
+        #time.sleep(2)
+        #date_fmt = datetime.strptime(date, "%Y-%m-%d").date().strftime("%a, %b %d")
+        #print(date_fmt)
         date_element.send_keys({date})
         date_element.send_keys(Keys.TAB)
         date_element.send_keys(Keys.RETURN)
-        time.sleep(1) # TODOO change this with an explicit wait which makes sure {data} has been written to date_element
+        time.sleep(1) 
         logging.info(f"Selected {flight_type} date: {date}")
     except TimeoutException:
         logging.error("Timeout while selecting {flight_type} date.")
@@ -186,14 +194,14 @@ def set_initial_page(driver, departure, arrival, max_nb_stops, max_flight_durati
         #EC.element_to_be_clickable((By.XPATH, "//div[text()='Cheapest']"))
         #)
         #cheapest_tab.click()
-        time.sleep(1)
+        #time.sleep(1)
 
         #time.sleep(20)
 
     except TimeoutException:
         logging.error("Timeout while setting up initial page.")
         return False
-    except e:
+    except:
         logging.error("Error while setting up initial page.")
         return None
 
@@ -220,7 +228,7 @@ def get_flight_price(driver):
     except TimeoutException:
         logging.error("Timeout while getting flight price.")
         return None
-    except e:
+    except:
         logging.error("Error while getting flight price.")
         return None
 
@@ -291,11 +299,11 @@ def get_cheapest_flight_price(driver, dep_date, ret_date):
 
         wait_for_all_progress_bars(driver)
         #time.sleep(20)
-        time.sleep(3)
+        time.sleep(1)
         #no_results_message = WebDriverWait(driver, 30).until(
         #EC.presence_of_element_located((By.XPATH, "//div[text()='No results returned.']"))
         #)
-        time.sleep(3)
+        #time.sleep(1)
         logging.info("Finished searching for cheapest flight.")
         return get_flight_price(driver)
     except TimeoutException:
