@@ -28,9 +28,10 @@ def main():
             	flight_data_df.at[index, 'price'] = price
 
     flight_data_df = flight_data_df.sort_values(by="price", ascending=True)
-    print(flight_data_df)
+    filename_prefix = f"{config.DEPARTURE}_{config.ARRIVAL}_D{config.DEPARTURE_DATE_MIN}_A{config.DEPARTURE_DATE_MAX}_TD{config.TRIP_DURATION_MIN}-{config.TRIP_DURATION_MAX}_FD{config.MAX_FLIGHT_DURATION}_S{config.MAX_NUMBER_OF_STOPS}"
+    utils.save_dataframe_to_csv(flight_data_df, filename_prefix, ".")
 
-    time.sleep(300)
+    #time.sleep(300)
 
 
 if __name__ == "__main__":
