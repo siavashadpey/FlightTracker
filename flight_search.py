@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def create_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # Use the new headless mode
+    #chrome_options.add_argument("--headless=new")  # Use the new headless mode
     # or chrome_options.add_argument("--headless") for older versions
     return webdriver.Chrome(options=chrome_options)
 
@@ -29,6 +29,15 @@ class FlightScraper(ABC):
     @abstractmethod
     def get_cheapest_flight_price(self, dep_date, ret_date):
         pass
+
+    def log_info(self, message):
+        logging.info(f"{self.__class__.__name__}: {message}")
+
+    def log_error(self, message):
+        logging.error(f"{self.__class__.__name__}: {message}")
+
+    def log_warning(self, message):
+        logging.warning(f"{self.__class__.__name__}: {message}")
 
 wait_time = 10
 max_tries = 5
@@ -53,7 +62,7 @@ class GoogleFlightScraper(FlightScraper):
         try:
             self.driver.get("https://www.google.com/flights")
             WebDriverWait(self.driver, wait_time).until(EC.url_contains("flights")) #Wait for the url to contains flight
-            logging.info("Opened Google Flights.")
+            self.log_info("Opened Google Flights.")
     
             if not self.set_airport('Where from?', departure):
                 return False
@@ -90,10 +99,10 @@ class GoogleFlightScraper(FlightScraper):
             #time.sleep(20)
     
         except TimeoutException:
-            logging.error("Timeout while setting up initial page.")
+            self.log_error("Timeout while setting up initial page.")
             return False
         except:
-            logging.error("Error while setting up initial page.")
+            self.log_error("Error while setting up initial page.")
             return None
     
         return True
@@ -108,9 +117,9 @@ class GoogleFlightScraper(FlightScraper):
             date_element.send_keys(Keys.TAB)
             date_element.send_keys(Keys.RETURN)
             time.sleep(1) 
-            logging.info(f"Selected {flight_type} date: {date}")
+            self.log_info(f"Selected {flight_type} date: {date}")
         except TimeoutException:
-            logging.error("Timeout while selecting {flight_type} date.")
+            self.log_error("Timeout while selecting {flight_type} date.")
             return False
     
         return True
@@ -129,9 +138,9 @@ class GoogleFlightScraper(FlightScraper):
             )
             ele_element.click()
             #time.sleep(1)
-            logging.info(f"Entered airport: {airport}")
+            self.log_info(f"Entered airport: {airport}")
         except TimeoutException:
-            logging.error("Timeout while setting airport.")
+            self.log_error("Timeout while setting airport.")
             return False
         
         return True
@@ -146,9 +155,9 @@ class GoogleFlightScraper(FlightScraper):
             )
             search_button.click()
             time.sleep(1) #TODO change to explicit wait to ensure search has taken effect
-            logging.info(f"Clicked search for flights.")
+            self.log_info(f"Clicked search for flights.")
         except TimeoutException:
-            logging.error("Timeout while clicking search.")
+            self.log_error("Timeout while clicking search.")
             return False
     
         return True
@@ -160,15 +169,15 @@ class GoogleFlightScraper(FlightScraper):
             )
             stops_button.click()
             time.sleep(1)
-            logging.info(f"Stops button clicked")
+            self.log_info(f"Stops button clicked")
             time.sleep(1)
             val = nb_max_stops + 1
             one_stop_option = self.driver.find_element(By.XPATH, f"//input[@type='radio' and @value='{val}']") # nb of stops + 1, capped at 2 stops, -1 nb of stops means infinte
             one_stop_option.click()
             time.sleep(1)
-            logging.info(f"Stops constraint set")
+            self.log_info(f"Stops constraint set")
         except TimeoutException:
-            logging.error("Timeout while setting stops constraint.")
+            self.log_error("Timeout while setting stops constraint.")
             return False
     
         return True
@@ -179,7 +188,7 @@ class GoogleFlightScraper(FlightScraper):
             EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Duration, Not selected']"))
             )
             duration_button.click()
-            logging.info(f"Duration button clicked")
+            self.log_info(f"Duration button clicked")
             time.sleep(1)
     
             # Wait for the slider to be present. Use a more robust locator.
@@ -189,9 +198,9 @@ class GoogleFlightScraper(FlightScraper):
             # Set the slider value using JavaScript for reliability
             self.driver.execute_script(f"arguments[0].value = {max_duration}; arguments[0].dispatchEvent(new Event('change'));", slider)
             time.sleep(1) #Important to give google time to update the interface
-            logging.info(f"Duration constraint set")
+            self.log_info(f"Duration constraint set")
         except TimeoutException:
-            logging.error("Timeout while setting duration constraint.")
+            self.log_error("Timeout while setting duration constraint.")
             return False
     
         return True
@@ -206,7 +215,7 @@ class GoogleFlightScraper(FlightScraper):
             time.sleep(1)
             self.driver.execute_script("arguments[0].click();", sort_dropdown)
             time.sleep(1)
-            logging.info("Clicked the sort dropdown (JavaScript).")
+            self.log_info("Clicked the sort dropdown (JavaScript).")
     
             WebDriverWait(self.driver, wait_time).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "ul[role='menu']"))
@@ -218,9 +227,9 @@ class GoogleFlightScraper(FlightScraper):
             time.sleep(1)
             price_option.click()
             time.sleep(1)
-            logging.info("Clicked sort by price.")
+            self.log_info("Clicked sort by price.")
         except TimeoutException:
-            logging.error("Timeout while setting up sort by price.")
+            self.log_error("Timeout while setting up sort by price.")
             return False
     
         return True
@@ -230,31 +239,31 @@ class GoogleFlightScraper(FlightScraper):
             departing_flights_heading = WebDriverWait(self.driver, wait_time).until(
             EC.presence_of_element_located((By.XPATH, "//div[@role='tabpanel'][.//h3[text()='Departing flights']]"))
             )
-            logging.info("Found flights list")
+            self.log_info("Found flights list")
     
             price_element = WebDriverWait(departing_flights_heading, wait_time).until(  # Wait relative to tab_panel
             EC.presence_of_element_located((By.XPATH, ".//span[contains(text(),'CA$')][1]"))
             )
-            logging.info("Found cheapest flight")
+            self.log_info("Found cheapest flight")
     
             price_match = re.search(r"[A-Z]{2}\$([\d,]+)", price_element.text)  # Matches "CA$", "US$", etc.
             if price_match:
                 price_str = price_match.group(1).replace(",", "")  # Remove commas
                 flight_price = int(price_str)
-                logging.info(f"Price: {flight_price}")
+                self.log_info(f"Price: {flight_price}")
                 return flight_price
         except TimeoutException:
-            logging.error("Timeout while getting flight price.")
+            self.log_error("Timeout while getting flight price.")
             return None
         except:
-            logging.error("Error while getting flight price.")
+            self.log_error("Error while getting flight price.")
             return None
     
     def wait_for_specific_progress_bar(self, wait_time=20, progress_bar_xpath=None):
         """Waits for a *specific* progress bar to become invisible."""
     
         if progress_bar_xpath is None:
-            logging.error("Progress_bar_xpath must be provided.")
+            self.log_error("Progress_bar_xpath must be provided.")
             return False
     
         try:
@@ -264,20 +273,20 @@ class GoogleFlightScraper(FlightScraper):
             WebDriverWait(self.driver, wait_time).until(
                 EC.visibility_of_element_located(progress_bar_locator)
             )
-            logging.info("Specific progress bar is visible. Waiting for it to become invisible...")
+            self.log_info("Specific progress bar is visible. Waiting for it to become invisible...")
     
             # Wait for the progress bar to become invisible
             WebDriverWait(self.driver, wait_time).until(
                 EC.invisibility_of_element_located(progress_bar_locator)
             )
-            logging.info("Specific progress bar finished!")
+            self.log_info("Specific progress bar finished!")
             return True
     
         except TimeoutException:
-            logging.error("Specific progress bar did not finish within the specified time.")
+            self.log_error("Specific progress bar did not finish within the specified time.")
             return False
         except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}")
+            self.log_error(f"An unexpected error occurred: {e}")
             return False
     
     def wait_for_all_progress_bars(self, wait_time=20, progress_bar_xpath="//div[@role='progressbar']"):
@@ -292,14 +301,14 @@ class GoogleFlightScraper(FlightScraper):
             WebDriverWait(self.driver, wait_time).until(
                 EC.invisibility_of_element_located(progress_bar_locator)
             )
-            logging.info("All progress bars finished!")
+            self.log_info("All progress bars finished!")
             return True
     
         except TimeoutException:
-            logging.error("Progress bars did not finish within the specified time.")
+            self.log_error("Progress bars did not finish within the specified time.")
             return False
         except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}")
+            self.log_error(f"An unexpected error occurred: {e}")
             return False
     
     def get_cheapest_flight_price(self, dep_date, ret_date):
@@ -321,7 +330,7 @@ class GoogleFlightScraper(FlightScraper):
     
             self.driver.refresh()
             time.sleep(1)
-            logging.info("refreshed")
+            self.log_info("refreshed")
     
             self.wait_for_all_progress_bars()
             #time.sleep(20)
@@ -330,10 +339,10 @@ class GoogleFlightScraper(FlightScraper):
             #EC.presence_of_element_located((By.XPATH, "//div[text()='No results returned.']"))
             #)
             #time.sleep(1)
-            logging.info("Finished searching for cheapest flight.")
+            self.log_info("Finished searching for cheapest flight.")
             return self.get_flight_price()
         except TimeoutException:
-            logging.error("Timeout while setting dates or getting price.")
+            self.log_error("Timeout while setting dates or getting price.")
             return None
 
 class KayakScraper(FlightScraper):
@@ -346,7 +355,7 @@ class KayakScraper(FlightScraper):
         nb_stops_str = self.get_nb_stops_str(max_nb_stops)
         dep_date_ph = "{departure_date}"
         ret_date_ph = "{return_date}"
-        url_template = f"https://www.kayak.com/flights/{departure}-{arrival}/{dep_date_ph}/{ret_date_ph}?sort=price_a&fs={max_flight_duration_str}{nb_stops_str}"
+        url_template = f"https://www.ca.kayak.com/flights/{departure}-{arrival}/{dep_date_ph}/{ret_date_ph}?sort=price_a&fs={max_flight_duration_str}{nb_stops_str}"
         return url_template
 
     def get_cheapest_flight_price(self, dep_date, ret_date):
@@ -362,18 +371,18 @@ class KayakScraper(FlightScraper):
         try:
             url = self.url_template.format(departure_date = dep_date, return_date = ret_date)
             self.driver.get(url)
-            logging.info("Opened Kayak.")
+            self.log_info("Opened Kayak.")
         
             # XPath using role and class
             progress_bar_locator = (By.XPATH, "//div[contains(@class,'progress')]//div[@role='progressbar']")
             
             # Wait for the element to be present
             WebDriverWait(self.driver, wait_time).until(EC.presence_of_element_located(progress_bar_locator))
-            logging.info("Found progress bar.")
+            self.log_info("Found progress bar.")
         
             #Wait for the attribute to change
-            WebDriverWait(self.driver, 30).until(EC.invisibility_of_element_located(progress_bar_locator))#, "aria-hidden", "true"))
-            logging.info("Progress completed.")
+            WebDriverWait(self.driver, 90).until(EC.invisibility_of_element_located(progress_bar_locator))#, "aria-hidden", "true"))
+            self.log_info("Progress completed.")
             time.sleep(1)
         
             cheapest_option = WebDriverWait(self.driver, wait_time).until(
@@ -382,21 +391,22 @@ class KayakScraper(FlightScraper):
         
             # Extract the price text. The structure is now more flexible
             price_element = cheapest_option.find_element(By.XPATH, ".//span[contains(text(),'$')]") #Finds the first span containing a dollar sign
-            logging.info("Found cheapest price.")
+            self.log_info("Found cheapest price.")
+            #time.sleep(20)
             price_text = price_element.text
             # Extract the numerical price using regex
-            price_match = re.search(r"\$([\d,]+)", price_text)
+            price_match = re.search(r"\bC\$ ([\d,]+)", price_text) 
             if price_match:
                 price_str = price_match.group(1).replace(",", "")
                 price = int(price_str)
-                logging.info(f"Cheapest price found: {price}")
+                self.log_info(f"Cheapest price found: {price}")
                 #time.sleep(10)
                 return price
             else:
-                logging.warning("Price format not found in 'Cheapest' option.")
+                self.log_warning(f"Price format not found in 'Cheapest' option: {price_text}")
                 return None
         except TimeoutException:
-            logging.error("Timeout while setting dates or getting price.")
+            self.log_error("Timeout while setting dates or getting price.")
             return None
         #time.sleep(200)
 
