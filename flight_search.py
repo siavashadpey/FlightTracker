@@ -27,10 +27,6 @@ class FlightScraper(ABC):
         self.driver = driver
 
     @abstractmethod
-    def set_initial_page(self, departure, arrival, max_nb_stops, max_flight_duration, dep_date, ret_date):
-        pass
-
-    @abstractmethod
     def get_cheapest_flight_price(self, dep_date, ret_date):
         pass
 
@@ -44,8 +40,8 @@ class GoogleFlightScraper(FlightScraper):
     def set_initial_page_persist(self, departure, arrival, max_nb_stops, max_flight_duration):
         StatusOK = False
         counter = 0
-        dep_date = (datetime.now() + timedelta(days=1)).strftime("%Y%-m-%d")
-        ret_date = (datetime.now() + timedelta(days=7)).strftime("%Y%-m-%d")
+        dep_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        ret_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
         while (not StatusOK and counter < max_tries):
             StatusOK = self.set_initial_page(departure, arrival, max_nb_stops, max_flight_duration, dep_date, ret_date)
             counter += 1
@@ -70,7 +66,6 @@ class GoogleFlightScraper(FlightScraper):
     
             if not self.set_travel_date('Return', ret_date):
                 return False
-    
     
             if not self.search_for_flights():
                 return False
@@ -285,7 +280,6 @@ class GoogleFlightScraper(FlightScraper):
             logging.error(f"An unexpected error occurred: {e}")
             return False
     
-    
     def wait_for_all_progress_bars(self, wait_time=20, progress_bar_xpath="//div[@role='progressbar']"):
         """Waits for *all* progress bars to become invisible."""
         try:
@@ -309,6 +303,15 @@ class GoogleFlightScraper(FlightScraper):
             return False
     
     def get_cheapest_flight_price(self, dep_date, ret_date):
+        counter = 0
+        while (counter < max_tries):
+            price = self.get_cheapest_flight_price_not_persist(dep_date, ret_date)
+            if price is not None:
+                return price
+            counter += 1
+        return None
+
+    def get_cheapest_flight_price_not_persist(self, dep_date, ret_date):
         try:
             if not self.set_travel_date('Departure', dep_date):
                 return None
@@ -332,3 +335,80 @@ class GoogleFlightScraper(FlightScraper):
         except TimeoutException:
             logging.error("Timeout while setting dates or getting price.")
             return None
+
+class KayakScraper(FlightScraper):
+    def __init__(self, driver, departure, arrival, max_nb_stops, max_flight_duration):
+        super().__init__(driver)
+        self.url_template = self.set_initial_page(departure, arrival, max_nb_stops, max_flight_duration)
+
+    def set_initial_page(self, departure, arrival, max_nb_stops, max_flight_duration):
+        max_flight_duration_str = self.get_max_flight_duration_str(max_flight_duration)
+        nb_stops_str = self.get_nb_stops_str(max_nb_stops)
+        dep_date_ph = "{departure_date}"
+        ret_date_ph = "{return_date}"
+        url_template = f"https://www.kayak.com/flights/{departure}-{arrival}/{dep_date_ph}/{ret_date_ph}?sort=price_a&fs={max_flight_duration_str}{nb_stops_str}"
+        return url_template
+
+    def get_cheapest_flight_price(self, dep_date, ret_date):
+        counter = 0
+        while (counter < max_tries):
+            price = self.get_cheapest_flight_price_not_persist(dep_date, ret_date)
+            if price is not None:
+                return price
+            counter += 1
+        return None
+
+    def get_cheapest_flight_price_not_persist(self, dep_date, ret_date):
+        try:
+            url = self.url_template.format(departure_date = dep_date, return_date = ret_date)
+            self.driver.get(url)
+            logging.info("Opened Kayak.")
+        
+            # XPath using role and class
+            progress_bar_locator = (By.XPATH, "//div[contains(@class,'progress')]//div[@role='progressbar']")
+            
+            # Wait for the element to be present
+            WebDriverWait(self.driver, wait_time).until(EC.presence_of_element_located(progress_bar_locator))
+            logging.info("Found progress bar.")
+        
+            #Wait for the attribute to change
+            WebDriverWait(self.driver, 30).until(EC.invisibility_of_element_located(progress_bar_locator))#, "aria-hidden", "true"))
+            logging.info("Progress completed.")
+            time.sleep(1)
+        
+            cheapest_option = WebDriverWait(self.driver, wait_time).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Cheapest']"))
+            )
+        
+            # Extract the price text. The structure is now more flexible
+            price_element = cheapest_option.find_element(By.XPATH, ".//span[contains(text(),'$')]") #Finds the first span containing a dollar sign
+            logging.info("Found cheapest price.")
+            price_text = price_element.text
+            # Extract the numerical price using regex
+            price_match = re.search(r"\$([\d,]+)", price_text)
+            if price_match:
+                price_str = price_match.group(1).replace(",", "")
+                price = int(price_str)
+                logging.info(f"Cheapest price found: {price}")
+                #time.sleep(10)
+                return price
+            else:
+                logging.warning("Price format not found in 'Cheapest' option.")
+                return None
+        except TimeoutException:
+            logging.error("Timeout while setting dates or getting price.")
+            return None
+        #time.sleep(200)
+
+    def get_max_flight_duration_str(self, fd_hrs):
+        fd_mins = fd_hrs * 60
+        return f"legdur=-{fd_mins}"
+
+    def get_nb_stops_str(self, max_nb_stops):
+        match max_nb_stops:
+            case -1 | 2:
+                return f";"
+            case 0:
+                return f";stops=~0"
+            case 1:
+                return f";stops=-2"
